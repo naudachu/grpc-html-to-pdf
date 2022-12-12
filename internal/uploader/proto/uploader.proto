@@ -1,0 +1,26 @@
+syntax = "proto3";
+
+package uploadbp;
+
+option go_package = "grpc-html-to-pdf/proto/uploadpb/uploadpb";
+
+service Uploader {
+    rpc PingPong(Ping) returns (Pong){}
+    rpc Upload (stream UploadRequest) returns (UploadResponse){}
+}
+
+message Ping {
+    string text = 1;
+}
+
+message Pong {
+    string text = 1;
+}
+
+message UploadRequest {
+    bytes chunk = 1;
+}
+
+message UploadResponse {
+    string answer = 1;
+}

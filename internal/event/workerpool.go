@@ -2,7 +2,6 @@ package event
 
 import (
 	"fmt"
-	"sync"
 	"time"
 )
 
@@ -14,7 +13,6 @@ type Pool struct {
 	concurrency   int
 	collector     chan *Task
 	runBackground chan bool
-	wg            sync.WaitGroup
 }
 
 // Inits new pool
@@ -52,20 +50,4 @@ func (p *Pool) RunBackground() {
 
 	p.runBackground = make(chan bool)
 	<-p.runBackground
-}
-
-// Run запускает всю работу в Pool и блокирует ее до тех пор,
-// пока она не будет закончена.
-func (p *Pool) Run() {
-	for i := 1; i <= p.concurrency; i++ {
-		worker := NewWorker(p.collector, i)
-		worker.Start(&p.wg)
-	}
-
-	for i := range p.Tasks {
-		p.collector <- p.Tasks[i]
-	}
-	close(p.collector)
-
-	p.wg.Wait()
 }

@@ -8,9 +8,10 @@ require (
 	google.golang.org/grpc v1.51.0
 )
 
+require github.com/SebastiaanKlippert/go-wkhtmltopdf v1.8.2 // indirect
+
 require (
-	github.com/goccy/go-json v0.9.7 // indirect
-	github.com/golang-queue/queue v0.1.3 // indirect
+	github.com/google/uuid v1.3.0
 	golang.org/x/net v0.0.0-20220722155237-a158d28d115b // indirect
 	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
 	golang.org/x/text v0.4.0 // indirect

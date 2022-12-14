@@ -5,14 +5,15 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	arch "grpc-html-to-pdf/internal/archiver"
 	conv "grpc-html-to-pdf/internal/converter"
 	"grpc-html-to-pdf/internal/event"
 	pb "grpc-html-to-pdf/internal/uploader/proto"
 	"io"
 	"log"
 	"os"
-	"time"
 
+	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -25,7 +26,7 @@ const (
 type Server struct {
 	pb.UnimplementedUploaderServer
 	tasks []*event.Task
-	pool  event.Pool
+	pool  *event.Pool
 }
 
 func NewUploaderService() *Server {
@@ -33,7 +34,7 @@ func NewUploaderService() *Server {
 	return &Server{
 		UnimplementedUploaderServer: pb.UnimplementedUploaderServer{},
 		tasks:                       tasks,
-		pool:                        *event.NewPool(tasks, 10),
+		pool:                        event.NewPool(tasks, 10),
 	}
 }
 
@@ -68,32 +69,9 @@ func tempDirectoriesPreparation() (string, error) {
 
 // Upload ...
 func (s *Server) Upload(stream pb.Uploader_UploadServer) error {
-
 	e := &event.Event{
-		Stream:      stream,
-		FilePath:    "",
-		Mem:         0,
-		Dur:         0,
-		Start:       time.Now().UTC(),
-		ArchiveSize: 0,
-		TempFolder:  "",
-		Status:      0,
+		UUID: uuid.New(),
 	}
-
-	t := event.NewTask(func(i interface{}) error {
-		err := processConvertion(i.(event.Event))
-		if err != nil {
-			logError(err)
-		}
-		return nil
-	}, *e)
-
-	s.pool.AddTask(t)
-
-	return nil
-}
-
-func processConvertion(e event.Event) error {
 
 	tempDir, err := tempDirectoriesPreparation()
 	if err != nil {
@@ -101,17 +79,14 @@ func processConvertion(e event.Event) error {
 	}
 
 	fileData := bytes.Buffer{}
-	fileSize := 0
+	var fileSize int64
+	fileSize = 0
 	// Reading the stream
 	for {
-		err := contextError(e.Stream.Context())
-		if err != nil {
-			return err
-		}
 
-		log.Print("waiting to receive more data")
+		//log.Print("waiting to receive more data")
 
-		req, err := e.Stream.Recv()
+		req, err := stream.Recv()
 		if err == io.EOF {
 			log.Print("no more data")
 			break
@@ -121,10 +96,10 @@ func processConvertion(e event.Event) error {
 		}
 
 		chunk := req.GetChunk()
-		size := len(chunk)
+		size := int64(len(chunk))
 		fileSize += size
 
-		log.Printf("new chunk: %d \t filesize: %d", size, fileSize)
+		//log.Printf("new chunk: %d \t filesize: %d", size, fileSize)
 
 		if fileSize > maxFileSize {
 			return logError(status.Errorf(codes.InvalidArgument, "file is too large: %d > %d", fileSize, maxFileSize))
@@ -135,6 +110,9 @@ func processConvertion(e event.Event) error {
 			return logError(status.Errorf(codes.Internal, "cannot write chunk data: %v", err))
 		}
 	}
+	stream.SendAndClose(&pb.UploadResponse{
+		Answer: e.UUID.String(),
+	})
 	log.Printf("stream is finished")
 
 	filePath := tempDir + "/tmp.zip"
@@ -149,31 +127,35 @@ func processConvertion(e event.Event) error {
 		return logError(fmt.Errorf("cannot write to file: %w", err))
 	}
 
-	/*err = arch.UnzipSource(filePath, tempDir)
+	e.PostUpload(filePath, tempDir, fileSize)
+
+	t := event.NewTask(func(i interface{}) error {
+		err := processConvertion(i.(*event.Event))
+		if err != nil {
+			logError(err)
+		}
+		return nil
+	}, e)
+
+	s.pool.AddTask(t)
+
+	return nil
+}
+
+func processConvertion(e *event.Event) error {
+	err := arch.UnzipSource(e.FilePath, e.TempFolder)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	c := make(chan event.Event)
-	go convertThread(c)
+	if err = conv.ConvertADRG(e); err != nil {
+		//if err = conv.PDFg(e); err != nil {
+		logError(err)
+	}
 
-	c <- event.Event{
-		FilePath:    filePath,
-		Mem:         0,
-		Dur:         0,
-		Start:       time.Now(),
-		TempFolder:  tempDir,
-		ArchiveSize: fileSize,
-	}*/
+	os.RemoveAll(e.TempFolder)
+
 	return nil
-}
-
-func convertThread(c chan event.Event) {
-	ev := <-c
-	conv.Convert(ev.TempFolder + "/index.html")
-
-	os.RemoveAll(ev.TempFolder)
-	ev.Dur = time.Since(ev.Start)
 }
 
 //contextError

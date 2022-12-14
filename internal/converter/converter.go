@@ -1,64 +1,39 @@
 package converter
 
 import (
+	"bytes"
+	"errors"
+	"fmt"
+	"grpc-html-to-pdf/internal/event"
+	"io/ioutil"
 	"log"
 	"os"
+	"time"
 
+	pdf2 "github.com/SebastiaanKlippert/go-wkhtmltopdf"
 	pdf "github.com/adrg/go-wkhtmltopdf"
 )
 
-func Convert(fileName string) {
-	// Initialize library.
-	if err := pdf.Init(); err != nil {
-		log.Fatal(err)
-	}
-	defer pdf.Destroy()
-
-	// Create object from file.
-	object, err := pdf.NewObject(fileName)
+func ConvertADRG(event *event.Event) error {
+	object, err := pdf.NewObject(event.TempFolder + "/index.html")
 	if err != nil {
-		log.Fatal(err)
+		log.Print(err)
+		return err
 	}
+
 	object.Header.ContentCenter = "[title]"
 	object.Header.DisplaySeparator = true
-
-	// Create object from URL.
-	/*object2, err := pdf.NewObject("https://google.com")
-	if err != nil {
-		log.Fatal(err)
-	}*/
 	object.Footer.ContentLeft = "[date]"
 	object.Footer.ContentCenter = "Sample footer information"
 	object.Footer.ContentRight = "[page]"
 	object.Footer.DisplaySeparator = true
 
-	// Create object from reader.
-	/*inFile, err := os.Open("sample2.html")
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer inFile.Close()
-
-	object3, err := pdf.NewObjectFromReader(inFile)
-	if err != nil {
-		log.Fatal(err)
-	}
-	object3.Zoom = 1.5
-	object3.TOC.Title = "Table of Contents"*/
-
-	// Create converter.
 	converter, err := pdf.NewConverter()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
-	defer converter.Destroy()
-
-	// Add created objects to the converter.
 	converter.Add(object)
-	/*converter.Add(object2)
-	converter.Add(object3)*/
 
-	// Set converter options.
 	converter.Title = "Sample document"
 	converter.PaperSize = pdf.A4
 	converter.Orientation = pdf.Landscape
@@ -68,13 +43,81 @@ func Convert(fileName string) {
 	converter.MarginRight = "10mm"
 
 	// Convert objects and save the output PDF document.
-	outFile, err := os.Create("out.pdf")
+
+	outfileName := fmt.Sprint(event.UUID, ".pdf")
+	outFile, err := os.Create(outfileName)
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 	defer outFile.Close()
 
 	if err := converter.Run(outFile); err != nil {
-		log.Fatal(err)
+		return err
 	}
+	stat, err := outFile.Stat()
+	if err != nil {
+		return err
+	}
+
+	if stat.Size() == 0 {
+		return errors.New("out file is empty")
+	}
+	converter.Destroy()
+
+	event.Dur = time.Since(event.Start)
+
+	return nil
+}
+
+func PDFg(event *event.Event) error {
+	pdfg, err := pdf2.NewPDFGenerator()
+	if err != nil {
+		return err
+	}
+	htmlfile, err := ioutil.ReadFile(event.TempFolder + "/index.html")
+	if err != nil {
+		return err
+	}
+
+	page := pdf2.NewPageReader(bytes.NewReader(htmlfile))
+	page.EnableLocalFileAccess.Set(true)
+	page.DisableExternalLinks.Set(true)
+	page.DisableInternalLinks.Set(true)
+
+	pdfg.AddPage(page)
+	pdfg.Dpi.Set(600)
+
+	// The contents of htmlsimple.html are saved as base64 string in the JSON file
+	/*jb, err := pdfg.ToJSON()
+	if err != nil {
+		return err
+	}
+
+	// Server code
+	pdfgFromJSON, err := pdf2.NewPDFGeneratorFromJSON(bytes.NewReader(jb))
+	if err != nil {
+		return err
+	}
+
+
+
+	err = pdfgFromJSON.Create()
+	if err != nil {
+		return err
+	}*/
+
+	err = pdfg.Create()
+	if err != nil {
+		return err
+	}
+
+	outfileName := fmt.Sprint(event.UUID, ".pdf")
+	err = pdfg.WriteFile(outfileName)
+	if err != nil {
+		return err
+	}
+
+	log.Printf("convertation for the %s finished", event.UUID.String())
+	event.Dur = time.Since(event.Start)
+	return nil
 }

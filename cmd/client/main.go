@@ -65,8 +65,9 @@ func main() {
 		}
 	}
 
-	_, err = stream.CloseAndRecv()
+	eventUUID, err := stream.CloseAndRecv()
 	if err != nil {
 		log.Fatal("cannot receive response: ", err)
 	}
+	log.Println(eventUUID)
 }

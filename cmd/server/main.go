@@ -8,10 +8,16 @@ import (
 
 	pb "grpc-html-to-pdf/internal/uploader/proto"
 
+	pdf "github.com/adrg/go-wkhtmltopdf"
 	"google.golang.org/grpc"
 )
 
 func main() {
+	if err := pdf.Init(); err != nil {
+		log.Fatal(err)
+	}
+	defer pdf.Destroy()
+
 	s := grpc.NewServer()
 	srv := uploader.NewUploaderService()
 	pb.RegisterUploaderServer(s, srv)

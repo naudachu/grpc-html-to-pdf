@@ -2,7 +2,6 @@ package event
 
 import (
 	"fmt"
-	"sync"
 )
 
 type Worker struct {
@@ -19,18 +18,6 @@ func NewWorker(channel chan *Task, ID int) *Worker {
 	}
 }
 
-func (wr *Worker) Start(wg *sync.WaitGroup) {
-	fmt.Printf("Starting worker %d\n", wr.ID)
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		for task := range wr.taskChan {
-			process(wr.ID, task)
-		}
-	}()
-}
-
 func (wr *Worker) StartBackground() {
 	fmt.Printf("Starting worker %d\n", wr.ID)
 
@@ -42,11 +29,4 @@ func (wr *Worker) StartBackground() {
 			return
 		}
 	}
-}
-
-func (wr *Worker) Stop() {
-	fmt.Printf("Closing worker %d\n", wr.ID)
-	go func() {
-		wr.quit <- true
-	}()
 }

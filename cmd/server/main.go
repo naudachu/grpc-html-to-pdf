@@ -13,13 +13,17 @@ import (
 
 func main() {
 	s := grpc.NewServer()
-	srv := &uploader.Server{}
+	srv := uploader.NewUploaderService()
 	pb.RegisterUploaderServer(s, srv)
 
 	listener, err := net.Listen("tcp", ":50051")
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	go func() {
+		srv.RunBackground()
+	}()
 
 	if err := s.Serve(listener); err != nil {
 		log.Fatal(err)

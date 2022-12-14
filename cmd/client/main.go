@@ -33,7 +33,7 @@ func main() {
 
 	file, err := os.Open(filePath)
 	if err != nil {
-		log.Fatal("cannot open image file: ", err)
+		log.Fatal("cannot open a file: ", err)
 	}
 	defer file.Close()
 

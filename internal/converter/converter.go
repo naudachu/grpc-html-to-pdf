@@ -14,8 +14,8 @@ import (
 	pdf "github.com/adrg/go-wkhtmltopdf"
 )
 
-func ConvertADRG(event *event.Event) error {
-	object, err := pdf.NewObject(event.TempFolder + "/index.html")
+func ConvertADRG(e *event.Event) error {
+	object, err := pdf.NewObject(e.TempFolder + "/index.html")
 	if err != nil {
 		log.Print(err)
 		return err
@@ -28,7 +28,7 @@ func ConvertADRG(event *event.Event) error {
 
 	// Convert objects and save the output PDF document.
 
-	outfileName := fmt.Sprint(event.UUID, ".pdf")
+	outfileName := fmt.Sprint(e.UUID, ".pdf")
 	outFile, err := os.Create(outfileName)
 	if err != nil {
 		return err

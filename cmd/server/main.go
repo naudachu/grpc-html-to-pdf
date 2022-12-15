@@ -3,16 +3,21 @@ package main
 import (
 	"log"
 	"net"
+	"os"
 
 	"grpc-html-to-pdf/internal/uploader"
 
 	pb "grpc-html-to-pdf/internal/uploader/proto"
 
 	pdf "github.com/adrg/go-wkhtmltopdf"
+	"github.com/google/uuid"
 	"google.golang.org/grpc"
 )
 
 func main() {
+	logFile, _ := os.Create("log-" + uuid.New().String())
+	log.SetOutput(logFile)
+
 	if err := pdf.Init(); err != nil {
 		log.Fatal(err)
 	}

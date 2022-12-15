@@ -34,7 +34,7 @@ func NewUploaderService() *Server {
 	return &Server{
 		UnimplementedUploaderServer: pb.UnimplementedUploaderServer{},
 		tasks:                       tasks,
-		pool:                        event.NewPool(tasks, 10),
+		pool:                        event.NewPool(tasks, 4),
 	}
 }
 
@@ -63,7 +63,6 @@ func tempDirectoriesPreparation() (string, error) {
 	if err != nil {
 		return "", logError(err)
 	}
-	log.Print("temp dirs created")
 	return tempDir, nil
 }
 
@@ -113,7 +112,6 @@ func (s *Server) Upload(stream pb.Uploader_UploadServer) error {
 	stream.SendAndClose(&pb.UploadResponse{
 		Answer: e.UUID.String(),
 	})
-	log.Printf("stream is finished")
 
 	filePath := tempDir + "/tmp.zip"
 
@@ -128,12 +126,20 @@ func (s *Server) Upload(stream pb.Uploader_UploadServer) error {
 	}
 
 	e.PostUpload(filePath, tempDir, fileSize)
+	log.Print("work done: " + e.String())
 
-	t := event.NewTask(func(i interface{}) error {
+	/*t := event.NewTask(func(i interface{}) error {
 		err := processConvertion(i.(*event.Event))
 		if err != nil {
 			logError(err)
 		}
+		return nil
+	}, e)
+
+	s.pool.AddTask(t)*/
+
+	t := event.NewTask(func(i interface{}) error {
+		conv.CountTillFifty(i.(*event.Event))
 		return nil
 	}, e)
 
@@ -142,14 +148,16 @@ func (s *Server) Upload(stream pb.Uploader_UploadServer) error {
 	return nil
 }
 
+// processConvertion
+/* describes the process of unzip and convert zip archive*/
 func processConvertion(e *event.Event) error {
 	err := arch.UnzipSource(e.FilePath, e.TempFolder)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if err = conv.ConvertADRG(e); err != nil {
-		//if err = conv.PDFg(e); err != nil {
+	//if err = conv.ConvertADRG(e); err != nil {
+	if err = conv.PDFg(e); err != nil {
 		logError(err)
 	}
 

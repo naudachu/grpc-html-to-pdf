@@ -20,27 +20,11 @@ func ConvertADRG(event *event.Event) error {
 		log.Print(err)
 		return err
 	}
-
-	object.Header.ContentCenter = "[title]"
-	object.Header.DisplaySeparator = true
-	object.Footer.ContentLeft = "[date]"
-	object.Footer.ContentCenter = "Sample footer information"
-	object.Footer.ContentRight = "[page]"
-	object.Footer.DisplaySeparator = true
-
 	converter, err := pdf.NewConverter()
 	if err != nil {
 		return err
 	}
 	converter.Add(object)
-
-	converter.Title = "Sample document"
-	converter.PaperSize = pdf.A4
-	converter.Orientation = pdf.Landscape
-	converter.MarginTop = "1cm"
-	converter.MarginBottom = "1cm"
-	converter.MarginLeft = "10mm"
-	converter.MarginRight = "10mm"
 
 	// Convert objects and save the output PDF document.
 
@@ -49,7 +33,6 @@ func ConvertADRG(event *event.Event) error {
 	if err != nil {
 		return err
 	}
-	defer outFile.Close()
 
 	if err := converter.Run(outFile); err != nil {
 		return err
@@ -62,19 +45,23 @@ func ConvertADRG(event *event.Event) error {
 	if stat.Size() == 0 {
 		return errors.New("out file is empty")
 	}
-	converter.Destroy()
 
-	event.Dur = time.Since(event.Start)
+	converter.Destroy()
+	outFile.Close()
+
+	e.Dur = time.Since(e.Start)
 
 	return nil
 }
 
-func PDFg(event *event.Event) error {
+//PDFg
+/*Converts files mentioned at the e.FilePath to PDF with SebastiaanKlippert/go-wkhtmltopdf*/
+func PDFg(e *event.Event) error {
 	pdfg, err := pdf2.NewPDFGenerator()
 	if err != nil {
 		return err
 	}
-	htmlfile, err := ioutil.ReadFile(event.TempFolder + "/index.html")
+	htmlfile, err := ioutil.ReadFile(e.TempFolder + "/index.html")
 	if err != nil {
 		return err
 	}
@@ -111,13 +98,22 @@ func PDFg(event *event.Event) error {
 		return err
 	}
 
-	outfileName := fmt.Sprint(event.UUID, ".pdf")
+	outfileName := fmt.Sprint(e.UUID, ".pdf")
 	err = pdfg.WriteFile(outfileName)
 	if err != nil {
 		return err
 	}
 
-	log.Printf("convertation for the %s finished", event.UUID.String())
-	event.Dur = time.Since(event.Start)
+	log.Printf("convertation for the %s finished", e.UUID.String())
+	e.Dur = time.Since(e.Start)
 	return nil
+}
+
+func CountTillFifty(e *event.Event) {
+	log.Printf("job starter for %s", e.UUID.String())
+	for i := 0; i < 49; i++ {
+		e.Counter++
+		time.Sleep(1 * time.Second)
+	}
+	log.Printf("job finished for %s, result: %s", e.UUID.String(), fmt.Sprint(e.Counter))
 }

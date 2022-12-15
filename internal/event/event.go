@@ -15,6 +15,8 @@ type Event struct {
 	Dur         time.Duration
 	Start       time.Time
 	ArchiveSize int64
+
+	Counter int
 }
 
 func NewEvent(path, dir string, size int64) *Event {

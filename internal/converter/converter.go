@@ -20,6 +20,11 @@ func ConvertADRG(e *event.Event) error {
 		log.Print(err)
 		return err
 	}
+	object.BlockLocalFileAccess = false
+	object.UseExternalLinks = false
+	object.UseLocalLinks = false
+	object.EnableJavascript = false
+
 	converter, err := pdf.NewConverter()
 	if err != nil {
 		return err
@@ -29,14 +34,20 @@ func ConvertADRG(e *event.Event) error {
 	// Convert objects and save the output PDF document.
 
 	outfileName := fmt.Sprint(e.UUID, ".pdf")
-	outFile, err := os.Create(outfileName)
+	outFile, err := os.OpenFile(outfileName, os.O_RDWR|os.O_CREATE, 0755)
+	if err != nil {
+		log.Fatal(err)
+	}
+	/*outFile, err := os.Create(outfileName)
 	if err != nil {
 		return err
+	}*/
+
+	convertErr := converter.Run(outFile) // [ ] Fails here at the level of c-lib;
+	if convertErr != nil {
+		return convertErr
 	}
 
-	if err := converter.Run(outFile); err != nil {
-		return err
-	}
 	stat, err := outFile.Stat()
 	if err != nil {
 		return err
@@ -61,12 +72,13 @@ func PDFg(e *event.Event) error {
 	if err != nil {
 		return err
 	}
-	htmlfile, err := ioutil.ReadFile(e.TempFolder + "/index.html")
+
+	outFile, err := ioutil.ReadFile(e.TempFolder + "/index.html")
 	if err != nil {
 		return err
 	}
 
-	page := pdf2.NewPageReader(bytes.NewReader(htmlfile))
+	page := pdf2.NewPageReader(bytes.NewReader(outFile))
 	page.EnableLocalFileAccess.Set(true)
 	page.DisableExternalLinks.Set(true)
 	page.DisableInternalLinks.Set(true)
@@ -93,7 +105,7 @@ func PDFg(e *event.Event) error {
 		return err
 	}*/
 
-	err = pdfg.Create()
+	err = pdfg.Create() // [ l Fails here;
 	if err != nil {
 		return err
 	}

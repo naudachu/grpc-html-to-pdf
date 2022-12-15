@@ -40,5 +40,5 @@ func (e *Event) PostUpload(path, dir string, size int64) *Event {
 }
 
 func (e *Event) String() string {
-	return fmt.Sprintf(e.UUID.String(), e.Dur, e.ArchiveSize, e.Start)
+	return fmt.Sprintf("Task: %s; Duration: %s, Size: %s, Timestamp: %s", e.UUID.String(), e.Dur.String(), fmt.Sprint(e.ArchiveSize), e.Start)
 }

@@ -12,6 +12,7 @@ import (
 	"io"
 	"log"
 	"os"
+	path "path/filepath"
 
 	"github.com/google/uuid"
 	"google.golang.org/grpc/codes"
@@ -34,7 +35,7 @@ func NewUploaderService() *Server {
 	return &Server{
 		UnimplementedUploaderServer: pb.UnimplementedUploaderServer{},
 		tasks:                       tasks,
-		pool:                        event.NewPool(tasks, 4),
+		pool:                        event.NewPool(tasks, 1),
 	}
 }
 
@@ -49,21 +50,26 @@ func (s *Server) PingPong(ctx context.Context, req *pb.Ping) (*pb.Pong, error) {
 }
 
 func tempDirectoriesPreparation() (string, error) {
+
 	//Create a folder for all Uploaded files
-	path := "uploads"
-	if _, err := os.Stat(path); errors.Is(err, os.ErrNotExist) {
-		err := os.Mkdir(path, os.ModePerm)
+	tmpFolder := "uploads"
+	if _, err := os.Stat(tmpFolder); errors.Is(err, os.ErrNotExist) {
+		err := os.Mkdir(tmpFolder, os.ModePerm)
 		if err != nil {
-			logError(err)
+			return "", err
 		}
 	}
 
 	//Prepare temporary folder for uploaded archive
 	tempDir, err := os.MkdirTemp("./uploads/", "tmp-*")
 	if err != nil {
-		return "", logError(err)
+		return "", err
 	}
-	return tempDir, nil
+	res, err := path.Abs(tempDir)
+	if err != nil {
+		return "", err
+	}
+	return res, nil
 }
 
 // Upload ...
@@ -113,7 +119,7 @@ func (s *Server) Upload(stream pb.Uploader_UploadServer) error {
 		Answer: e.UUID.String(),
 	})
 
-	filePath := tempDir + "/tmp.zip"
+	filePath := path.Join(tempDir, "tmp.zip")
 
 	file, err := os.Create(filePath)
 	if err != nil {
@@ -128,7 +134,7 @@ func (s *Server) Upload(stream pb.Uploader_UploadServer) error {
 	e.PostUpload(filePath, tempDir, fileSize)
 	log.Print("work done: " + e.String())
 
-	/*t := event.NewTask(func(i interface{}) error {
+	t := event.NewTask(func(i interface{}) error {
 		err := processConvertion(i.(*event.Event))
 		if err != nil {
 			logError(err)
@@ -136,12 +142,11 @@ func (s *Server) Upload(stream pb.Uploader_UploadServer) error {
 		return nil
 	}, e)
 
-	s.pool.AddTask(t)*/
-
-	t := event.NewTask(func(i interface{}) error {
+	// Debug workers
+	/*t := event.NewTask(func(i interface{}) error {
 		conv.CountTillFifty(i.(*event.Event))
 		return nil
-	}, e)
+	}, e)*/
 
 	s.pool.AddTask(t)
 
@@ -156,12 +161,13 @@ func processConvertion(e *event.Event) error {
 		log.Fatal(err)
 	}
 
-	//if err = conv.ConvertADRG(e); err != nil {
-	if err = conv.PDFg(e); err != nil {
+	if err = conv.ConvertADRG(e); err != nil {
+		//if err = conv.PDFg(e); err != nil {
 		logError(err)
 	}
 
 	os.RemoveAll(e.TempFolder)
+	log.Print(e)
 
 	return nil
 }
